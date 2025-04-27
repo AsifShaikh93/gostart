@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gostart-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gostart
+  template:
+    metadata:
+      labels:
+        app: gostart
+    spec:
+      containers:
+        - name: gostart
+          image: asif1993/gostart:v1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8083
+          env:
+            - name: DB_USER
+              value: "root"
+            - name: DB_PASS
+              value: "root"
+            - name: DB_HOST
+              value: "127.0.0.1:3306"
+            - name: DB_NAME
+              value: "crud_auth"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gostart-svc
+spec:
+  selector:
+    app: gostart
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8083
+
