@@ -17,7 +17,7 @@ type User struct {
 }
 
 func main() {
-	dsn := "root:root@tcp(127.0.0.1:3306)/crud_auth?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root@tcp(192.168.3.193:3306)/crud_auth?charset=utf8mb4&parseTime=True&loc=Local"
 	var err error
 	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -35,7 +35,6 @@ func main() {
 	r.GET("/login", showLoginPage)
 	r.POST("/login", handleLogin)
 
-	Goprac()
 	r.Run(":8083")
 
 }
@@ -45,13 +44,32 @@ func showSignupPage(c *gin.Context) {
 }
 
 func handleSignup(c *gin.Context) {
+
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 
-	user := User{Username: username, Password: password}
-	result := db.Create(&user)
+	type signupresult struct {
+		success bool
+		err     error
+	}
 
-	if result.Error != nil {
+	signupchan := make(chan signupresult)
+
+	go func() {
+		user := User{Username: username, Password: password}
+		result := db.Create(&user)
+
+		if result.Error != nil {
+			signupchan <- signupresult{success: false, err: result.Error}
+			return
+		}
+
+		signupchan <- signupresult{success: true, err: nil}
+	}()
+
+	res := <-signupchan
+
+	if res.err != nil {
 		c.String(http.StatusInternalServerError, "Signup failed")
 		return
 	}
@@ -68,10 +86,29 @@ func handleLogin(c *gin.Context) {
 	password := c.PostForm("password")
 
 	var user User
-	result := db.Where("username = ? AND password = ?", username, password).First(&user)
 
-	if result.Error != nil {
-		c.String(http.StatusUnauthorized, "Invalid login credentials")
+	type loginresult struct {
+		success bool
+		err     error
+	}
+
+	chanresult := make(chan loginresult)
+	go func() {
+		result := db.Where("username=? AND password=?", username, password).First(&user)
+
+		if result.Error != nil {
+			chanresult <- loginresult{success: false, err: result.Error}
+			return
+		}
+
+		chanresult <- loginresult{success: true, err: nil}
+
+	}()
+
+	res := <-chanresult
+
+	if res.err != nil {
+		c.String(http.StatusUnauthorized, "invalid user")
 		return
 	}
 
